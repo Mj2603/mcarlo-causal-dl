@@ -1,124 +1,60 @@
-# Advanced Causal Inference Framework for Deep Learning Models via Monte Carlo Integration Methods in Financial Markets
+# mcarlo-causal-dl: backdoor adjustment on a synthetic SCM
 
-## Overview
+A small, tested demonstration of confounding bias and backdoor adjustment. A structural causal model (SCM) with one observed confounder Z generates SYNTHETIC observational data; the true average treatment effect (ATE) of the treatment X on the outcome Y is known in closed form. The repository compares a naive regression slope, which is biased by confounding, against a backdoor-adjusted (g-formula) estimator that averages a fitted outcome model over the empirical distribution of Z. Despite the repository name, there is no deep learning and no financial market data in this project.
 
-This repository presents a comprehensive causal inference framework that bridges the gap between observational data analysis and causal understanding in financial markets. The framework leverages Monte Carlo integration methods to perform backdoor adjustment and estimate treatment effects in the presence of confounding variables, with direct applications to algorithmic trading strategies and market microstructure analysis.
+## Model
 
-## Research Motivation
+```
+Z ~ N(0, 1)
+X = a * 1{Z > 0} + b * Z + U,          U ~ N(0, sigma_u^2)
+Y = c * X + d * Z + e * X * Z + eps,   eps ~ N(0, sigma_y^2)
+```
 
-Traditional machine learning approaches often fail to capture causal relationships in financial data, leading to spurious correlations and poor out-of-sample performance. This work addresses this limitation by implementing structural causal models (SCMs) that explicitly model the data-generating process, enabling reliable causal inference even in the presence of unobserved confounders.
+Defaults: a = 1, b = 0.1, sigma_u = 0.5, c = 2, d = 0.5, e = 0.3, sigma_y = 0.5. Because E[Z] = 0, the true ATE of do(X = 1) versus do(X = 0) is c = 2.
 
-## Key Contributions
+## What is implemented
 
-- **Structural Causal Models**: Implementation of SCMs with explicit confounding variable modeling
-- **Monte Carlo Integration**: Efficient backdoor adjustment using Monte Carlo methods for treatment effect estimation
-- **Intervention Queries**: Framework for counterfactual analysis and "what-if" scenario testing
-- **Financial Applications**: Direct applicability to market microstructure analysis and trading strategy development
-- **Reproducible Research**: Complete experimental pipeline with synthetic data generation and evaluation metrics
+- `ConfoundedSCM` (`src/mcarlo_causal/scm.py`): seeded sampling from the observational distribution; the closed-form true ATE; the closed-form population OLS slope of Y on X (the naive estimand); and an oracle Monte Carlo simulation of do(X) that uses the true structural equations, as a check on the simulator.
+- Estimators (`src/mcarlo_causal/estimators.py`) that use only observed (z, x, y):
+  - `naive_slope`: OLS slope of Y on X, without adjustment.
+  - `backdoor_regression_ate`: OLS outcome model for E[Y | X, Z], with or without the X*Z term, averaged over observed z values (g-formula).
+  - `bootstrap_ci`: nonparametric percentile bootstrap interval.
+- `experiments/run_experiment.py`: repeated-sampling comparison that writes `results/ate_comparison.md` and `results/ate_comparison.csv`.
+- `tests/`: checks against closed-form values (true ATE, naive slope bias with and without interaction), large-sample consistency, an exact noiseless case, a no-confounding invariant, and seeded reproducibility.
 
-## Technical Implementation
-
-The framework consists of three main components:
-
-1. **SCM Simulation Engine**: Generates synthetic data following specified causal relationships
-2. **Monte Carlo Estimator**: Performs backdoor adjustment via Monte Carlo integration
-3. **Evaluation Pipeline**: Compares causal estimates against naive observational approaches
-
-## Mathematical Foundation
-
-The core methodology is based on Pearl's causal hierarchy, specifically:
-- **Level 1 (Association)**: P(Y|X) - What we observe
-- **Level 2 (Intervention)**: P(Y|do(X)) - What happens if we intervene
-- **Level 3 (Counterfactuals)**: P(Y_x|X=x', Y=y') - What would have happened
-
-## Applications in Quantitative Finance
-
-- **Strategy Stress Testing**: Evaluate trading strategies under different market conditions
-- **Risk Factor Analysis**: Identify causal drivers of portfolio returns
-- **Market Microstructure**: Understand causal relationships in high-frequency trading data
-- **Regulatory Compliance**: Assess causal impact of regulatory changes on market behavior
-
-## Quickstart
+## How to run
 
 ```bash
-# Clone the repository
 git clone https://github.com/Mj2603/mcarlo-causal-dl.git
 cd mcarlo-causal-dl
-
-# Set up environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# Run the demonstration
-python examples/demo.py
+pytest
+python experiments/run_experiment.py
 ```
 
-## Expected Outputs
+`requirements.txt` installs numpy, pytest and this package in editable mode. The experiment takes about 15 seconds.
 
-- Average Treatment Effect (ATE) via backdoor adjustment
-- Comparison with naive observational estimates
-- Visualization of causal relationships
-- Performance metrics and statistical significance tests
+## Results
 
-## Project Structure
+Data source: SYNTHETIC samples from `ConfoundedSCM()` with default parameters, seed 20240607, 200 replications of n = 5000. Copied from `results/ate_comparison.md`.
 
-```
-mcarlo-causal-dl/
-├── src/
-│   └── causal_mc.py          # Core SCM and Monte Carlo implementation
-├── examples/
-│   └── demo.py               # End-to-end demonstration
-├── outputs/                  # Generated plots and results
-├── requirements.txt          # Python dependencies
-└── README.md                # This file
-```
+True ATE (closed form): 2.0000. Population naive OLS slope (closed form): 2.5499.
 
-## Dependencies
+| Estimator | Mean | Bias | Std | RMSE |
+|---|---|---|---|---|
+| naive OLS slope (no adjustment) | 2.5498 | +0.5498 | 0.0147 | 0.5499 |
+| backdoor, linear model without X*Z | 2.0012 | +0.0012 | 0.0135 | 0.0135 |
+| backdoor, linear model with X*Z | 2.0008 | +0.0008 | 0.0130 | 0.0130 |
+| oracle Monte Carlo do(X) simulation | 1.9993 | -0.0007 | 0.0111 | 0.0111 |
 
-- NumPy: Numerical computations and array operations
-- SciPy: Statistical functions and optimization
-- Scikit-learn: Machine learning utilities
-- Matplotlib: Visualization and plotting
-- Pandas: Data manipulation and analysis
+95% percentile bootstrap coverage for the backdoor estimator with X*Z (200 resamples): 0.950 (190/200).
 
-## Research Applications
+## Limitations
 
-This framework is particularly valuable for:
-- **Academic Research**: Causal inference in financial markets
-- **Industry Applications**: Algorithmic trading strategy development
-- **Risk Management**: Understanding causal drivers of portfolio risk
-- **Regulatory Analysis**: Assessing policy impact on market behavior
-
-## Future Extensions
-
-- Integration with real market data feeds
-- Extension to time-series causal models
-- Implementation of more sophisticated SCM structures
-- Integration with deep learning frameworks for high-dimensional data
-
-## Citation
-
-If you use this work in your research, please cite:
-
-```bibtex
-@software{mcarlo_causal_dl,
-  title={Advanced Causal Inference Framework for Deep Learning Models via Monte Carlo Integration Methods in Financial Markets},
-  author={Balkrishnan, Mrityunjay},
-  year={2024},
-  url={https://github.com/Mj2603/mcarlo-causal-dl}
-}
-```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-## Contact
-
-For questions or collaborations, please contact mrityunjay2603@gmail.com or open an issue on GitHub.
-
+- The confounder is observed and the outcome model with X*Z is correctly specified, so backdoor adjustment is expected to work. The project does not address unobserved confounding, model selection, or high-dimensional covariates.
+- The model without X*Z is misspecified; its small bias here is specific to this SCM (E[Z] = 0) and should not be generalised.
+- The oracle Monte Carlo row uses the true structural equations and is not available with real data.
+- All data are synthetic. Nothing here has been applied to market data, and no trading, risk or regulatory claims are made.
+- Counterfactual (level 3) queries are not implemented.
