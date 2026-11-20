@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcarlo-causal"
+version = "0.2.0"
+description = "Backdoor adjustment on a synthetic structural causal model with a known treatment effect"
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.22"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
